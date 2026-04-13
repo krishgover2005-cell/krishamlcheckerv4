@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AML Transaction Checker Pro — Krish Grover</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080c10;color:#c9d1d9;font-family:'JetBrains Mono','Courier New',monospace;min-height:100vh}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:2px}
+select option{background:#0d1117;color:#c9d1d9}
+input:focus,select:focus,textarea:focus{border-color:#3b82f6!important;box-shadow:0 0 0 3px rgba(59,130,246,.15)!important;outline:none!important}
+button:hover{filter:brightness(1.1);transform:translateY(-1px)}button:active{transform:scale(.97)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideR{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.card{animation:in .3s ease}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+#load{position:fixed;inset:0;background:#080c10;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:9999}
+#load h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#f1f5f9}
+#load .dot{width:10px;height:10px;border-radius:50%;background:#3b82f6;animation:pulse 1.2s infinite}
+#load p{font-size:11px;color:#64748b;letter-spacing:.1em}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:10000;animation:in .2s ease}
+.modal-box{background:#0d1117;border:1px solid #1e3a5f;border-radius:10px;padding:20px;max-width:400px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+<div id="load"><h2>AML Checker Pro</h2><div class="dot"></div><p>LOADING...</p></div>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useCallback}=React;
+
+/* ═══════════════════════════════════════════
+   AML TRANSACTION CHECKER PRO v4.5
+   Krish Grover · BVoc BFSI · Ramanujan College · DU
+   Works: Claude App ✅  Shared Link ✅  Any Browser ✅
+   NEW: SANDBOX · Confirmations · Officer Remarks · Enhanced India Logic
+═══════════════════════════════════════════ */
+
+// ── UNIVERSAL STORAGE (Claude OR localStorage) ──
+const DB={
+  get:async(k)=>{try{if(window.storage?.get)return await window.storage.get(k);}catch(_){}try{const v=localStorage.getItem(k);return v?{value:v}:null;}catch(_){return null;}},
+  set:async(k,v)=>{try{if(window.storage?.set)return await window.storage.set(k,v);}catch(_){}try{localStorage.setItem(k,v);}catch(_){}return{value:v};},
+  del:async(k)=>{try{if(window.storage?.delete)return await window.storage.delete(k);}catch(_){}try{localStorage.removeItem(k);}catch(_){}return{deleted:true};}
+};
+
+// ── COUNTRY RISK DATABASE (195 countries — FATF, GIABA, APG, Basel AML Index) ──
+const COUNTRY_RISK={
+  "Afghanistan":"HIGH","Algeria":"HIGH","Angola":"HIGH",
+  "Burkina Faso":"HIGH","Burundi":"HIGH","Cameroon":"HIGH",
+  "Central African Republic":"HIGH","Chad":"HIGH",
+  "Congo (Kinshasa)":"HIGH","Côte d'Ivoire":"HIGH",
+  "Eritrea":"HIGH","Ethiopia":"HIGH","Gabon":"HIGH",
+  "Guinea":"HIGH","Guinea-Bissau":"HIGH","Haiti":"HIGH",
+  "Iran":"HIGH","Iraq":"HIGH","Kenya":"MEDIUM",
+  "Laos":"HIGH","Lebanon":"HIGH","Liberia":"HIGH",
+  "Libya":"HIGH","Mali":"HIGH","Mozambique":"HIGH",
+  "Myanmar":"HIGH","Nicaragua":"HIGH","Niger":"HIGH",
+  "Nigeria":"MEDIUM","North Korea":"HIGH","Pakistan":"HIGH",
+  "Panama":"MEDIUM","Philippines":"MEDIUM","Russia":"HIGH",
+  "Senegal":"MEDIUM","Sierra Leone":"HIGH","Somalia":"HIGH",
+  "South Sudan":"HIGH","Sudan":"HIGH","Syria":"HIGH",
+  "Tanzania":"MEDIUM","Venezuela":"HIGH","Vietnam":"MEDIUM",
+  "Yemen":"HIGH","Zimbabwe":"HIGH",
+  "Albania":"MEDIUM","Armenia":"MEDIUM","Azerbaijan":"MEDIUM",
+  "Bangladesh":"MEDIUM","Belarus":"MEDIUM","Benin":"MEDIUM",
+  "Bolivia":"MEDIUM","Bosnia and Herzegovina":"MEDIUM",
+  "Brazil":"MEDIUM","Cambodia":"MEDIUM","Cape Verde":"MEDIUM",
+  "Colombia":"MEDIUM","Comoros":"MEDIUM","Congo (Brazzaville)":"MEDIUM",
+  "Cuba":"MEDIUM","Djibouti":"MEDIUM","Dominican Republic":"MEDIUM",
+  "Ecuador":"MEDIUM","Egypt":"MEDIUM","El Salvador":"MEDIUM",
+  "Equatorial Guinea":"MEDIUM","Eswatini":"MEDIUM","Fiji":"MEDIUM",
+  "Gambia":"MEDIUM","Georgia":"MEDIUM","Ghana":"MEDIUM",
+  "Guatemala":"MEDIUM","Guyana":"MEDIUM","Honduras":"MEDIUM",
+  "India":"MEDIUM","Indonesia":"MEDIUM","Jamaica":"MEDIUM",
+  "Jordan":"MEDIUM","Kazakhstan":"MEDIUM","Kosovo":"MEDIUM",
+  "Kuwait":"MEDIUM","Kyrgyzstan":"MEDIUM","Madagascar":"MEDIUM",
+  "Malawi":"MEDIUM","Malaysia":"MEDIUM","Maldives":"MEDIUM",
+  "Marshall Islands":"MEDIUM","Mauritania":"MEDIUM","Mauritius":"MEDIUM",
+  "Mexico":"MEDIUM","Moldova":"MEDIUM","Mongolia":"MEDIUM",
+  "Montenegro":"MEDIUM","Morocco":"MEDIUM","Namibia":"MEDIUM",
+  "Nepal":"MEDIUM","Oman":"MEDIUM","Palestine":"MEDIUM",
+  "Papua New Guinea":"MEDIUM","Paraguay":"MEDIUM","Peru":"MEDIUM",
+  "Qatar":"MEDIUM","Romania":"MEDIUM","Rwanda":"MEDIUM",
+  "Saudi Arabia":"MEDIUM","Serbia":"MEDIUM","South Africa":"MEDIUM",
+  "Sri Lanka":"MEDIUM","Suriname":"MEDIUM","Tajikistan":"MEDIUM",
+  "Thailand":"MEDIUM","Timor-Leste":"MEDIUM","Togo":"MEDIUM",
+  "Trinidad and Tobago":"MEDIUM","Tunisia":"MEDIUM","Turkey":"MEDIUM",
+  "Turkmenistan":"MEDIUM","Uganda":"MEDIUM","Ukraine":"MEDIUM",
+  "United Arab Emirates":"MEDIUM","Uzbekistan":"MEDIUM","Zambia":"MEDIUM",
+  "Andorra":"LOW","Antigua and Barbuda":"LOW","Argentina":"LOW",
+  "Australia":"LOW","Austria":"LOW","Bahamas":"LOW","Bahrain":"LOW",
+  "Barbados":"LOW","Belgium":"LOW","Belize":"LOW","Bhutan":"LOW",
+  "Botswana":"LOW","Brunei":"LOW","Bulgaria":"LOW","Canada":"LOW",
+  "Chile":"LOW","China":"LOW","Costa Rica":"LOW","Croatia":"LOW",
+  "Cyprus":"LOW","Czech Republic":"LOW","Denmark":"LOW",
+  "Dominica":"LOW","Estonia":"LOW","Finland":"LOW","France":"LOW",
+  "Germany":"LOW","Greece":"LOW","Grenada":"LOW","Hong Kong":"LOW",
+  "Hungary":"LOW","Iceland":"LOW","Ireland":"LOW","Israel":"MEDIUM",
+  "Italy":"LOW","Japan":"LOW","Kiribati":"LOW","Latvia":"LOW",
+  "Liechtenstein":"LOW","Lithuania":"LOW","Luxembourg":"LOW",
+  "Malta":"LOW","Micronesia":"LOW","Monaco":"LOW","Nauru":"LOW",
+  "Netherlands":"LOW","New Zealand":"LOW","North Macedonia":"LOW",
+  "Norway":"LOW","Palau":"LOW","Poland":"LOW","Portugal":"LOW",
+  "Saint Kitts and Nevis":"LOW","Saint Lucia":"LOW",
+  "Saint Vincent and the Grenadines":"LOW","Samoa":"LOW",
+  "San Marino":"LOW","Sao Tome and Principe":"LOW",
+  "Seychelles":"LOW","Singapore":"LOW","Slovakia":"LOW",
+  "Slovenia":"LOW","Solomon Islands":"LOW","South Korea":"LOW",
+  "Spain":"LOW","Sweden":"LOW","Switzerland":"LOW","Taiwan":"LOW",
+  "Tonga":"LOW","Tuvalu":"LOW","United Kingdom":"LOW",
+  "United States":"LOW","Uruguay":"LOW","Vanuatu":"LOW",
+  "Vatican City":"LOW","Cambodia":"HIGH","Cabo Verde":"LOW",
+};
+
+function getCountryRisk(country){
+  const r=COUNTRY_RISK[country];
+  if(r)return r;
+  const HRC=new Set(["iran","north korea","myanmar","syria","yemen","pakistan","haiti","panama","philippines","south sudan","sudan","venezuela","russia","afghanistan","libya"]);
+  if(HRC.has((country||"").toLowerCase().trim()))return"HIGH";
+  return"MEDIUM";
+}
+
+// ── CONSTANTS ──
+const CTR=1000000,WIRE=500000,INDIA_LOW_THRESHOLD=50000;
+const HRT=new Set(["CRYPTO","HAWALA","SHELL_COMPANY","OFFSHORE","BEARER_BOND","CASINO","VIRTUAL_ASSET"]);
+const CTRY=["Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia","Cameroon","Canada","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo (Brazzaville)","Congo (Kinshasa)","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestine","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Vanuatu","Vatican City","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe"];
+const TXG=[{g:"Cash",i:["CASH_DEPOSIT","CASH_WITHDRAWAL"]},{g:"Bank",i:["NEFT","RTGS","IMPS","UPI","WIRE_TRANSFER","SWIFT","CHEQUE","DD"]},{g:"High Risk",i:["CRYPTO","HAWALA","SHELL_COMPANY","OFFSHORE","BEARER_BOND","CASINO","VIRTUAL_ASSET"]},{g:"Other",i:["INSURANCE_PREMIUM","LOAN_REPAYMENT","TRADE_FINANCE","INVESTMENT"]}];
+const RS={HIGH:{bg:"#1a0505",border:"#ef4444",badge:"#ef4444",text:"#f87171",bt:"#fff"},MEDIUM:{bg:"#1a1000",border:"#f59e0b",badge:"#f59e0b",text:"#fbbf24",bt:"#fff"},LOW:{bg:"#001515",border:"#06b6d4",badge:"#06b6d4",text:"#22d3ee",bt:"#fff"},CLEAN:{bg:"#001508",border:"#10b981",badge:"#10b981",text:"#34d399",bt:"#001a0a"}};
+const E0={txn_id:"",account_id:"",customer_name:"",date:"",amount:"",currency:"INR",txn_type:"",channel:"BRANCH",country:"",counterparty:"",notes:""};
+const fmt=n=>parseFloat(n).toLocaleString("en-IN");
+const now=()=>new Date().toLocaleString("en-IN");
+const td=()=>new Date().toISOString().slice(0,10);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc=s=>(s||"").toString().replace(/'/g,"''");
+const INP={background:"#080c10",border:"1px solid #1e3a5f",color:"#c9d1d9",borderRadius:6,padding:"10px 12px",width:"100%",fontFamily:"'JetBrains Mono',monospace",fontSize:13,outline:"none"};
+
+// ── AML ENGINE (ENHANCED INDIA LOGIC) ──
+function aml(t){
+  const f=[],a=parseFloat(t.amount)||0,ty=(t.txn_type||"").toUpperCase().trim(),
+        c=(t.country||"").toLowerCase().trim(),
+        ca=["CASH_DEPOSIT","CASH_WITHDRAWAL"].includes(ty);
+  const cRisk=getCountryRisk(t.country||"");
+  const isIndia=(t.country||"").toLowerCase().trim()==="india";
+  
+  // INDIA-SPECIFIC LOGIC: Under 50K INR is CLEAN unless CASH
+  if(isIndia&&a<INDIA_LOW_THRESHOLD&&!ca){
+    return{flags:[],risk:"CLEAN",badges:[]};
+  }
+  
+  // CTR REPORTABLE badge for transactions over 10L
+  let badges=[];
+  if(a>=CTR){
+    badges.push("CTR REPORTABLE");
+  }
+  
+  if(ca&&a>=CTR)f.push({rule:"CTR — PMLA Rule 3",level:"HIGH",detail:`Cash Rs.${fmt(a)} ≥ Rs.10L. Mandatory CTR to FIU-IND within 15 days.`});
+  if(!ca&&a>=CTR)f.push({rule:"Large Transaction — PMLA §12",level:"HIGH",detail:`Non-cash Rs.${fmt(a)} ≥ Rs.10L. STR must be filed within 7 days.`});
+  if(cRisk==="HIGH")f.push({rule:`High-Risk Country — FATF/Basel [${t.country}]`,level:"HIGH",detail:`${t.country} is classified HIGH risk per FATF greylist/blacklist or Basel AML Index. EDD mandatory.`});
+  else if(cRisk==="MEDIUM")f.push({rule:`Elevated-Risk Country [${t.country}]`,level:"MEDIUM",detail:`${t.country} carries elevated ML/TF risk per Basel AML Index. Enhanced monitoring recommended.`});
+  if(["WIRE_TRANSFER","SWIFT"].includes(ty)&&a>=WIRE)f.push({rule:"Cross-Border Wire — FEMA/RBI",level:"HIGH",detail:`Wire Rs.${fmt(a)} ≥ Rs.5L. CWTR required.`});
+  if(HRT.has(ty))f.push({rule:`High-Risk Type [${ty}]`,level:"MEDIUM",detail:`${ty} carries elevated ML/TF risk.`});
+  if(a>=100000&&a%100000===0)f.push({rule:"Round Amount Anomaly",level:"MEDIUM",detail:`Rs.${fmt(a)} perfectly round — common layering indicator.`});
+  if(ca&&a>0&&a<CTR*.95)f.push({rule:"Potential Structuring — PMLA §3",level:"MEDIUM",detail:`Cash near Rs.10L threshold — watch for repeated transactions.`});
+  const risk=f.some(x=>x.level==="HIGH")?"HIGH":f.some(x=>x.level==="MEDIUM")?"MEDIUM":f.length>0?"LOW":"CLEAN";
+  return{flags:f,risk,badges};
+}
+
+// ── COLUMN MAPPER ──
+const CA={customer_name:["customer_name","customer","name","account holder"],amount:["amount","amt","transaction amount","value"],country:["country","nation"],txn_type:["txn_type","type","transaction type","payment type"],txn_id:["txn_id","txn id","transaction id","id","ref"],account_id:["account_id","account id","account","acc"],date:["date","txn date","value date"],channel:["channel","mode"],counterparty:["counterparty","beneficiary","sender","payee"],notes:["notes","remarks","narration"],currency:["currency","ccy"]};
+function nk(r){const x=(r||"").toString().toLowerCase().trim().replace(/[\s_-]+/g,"_");for(const[k,a]of Object.entries(CA))if(a.some(v=>x===v.replace(/\s/g,"_")||x.includes(v.replace(/\s/g,"_"))))return k;return x;}
+function mr(raw){const o={};for(const k of Object.keys(raw))o[nk(k)]=raw[k];return o;}
+
+// ── EXPORTS ──
+function xls(rows,fn="aml"){
+  const d=rows.map(r=>({TXN_ID:r.txn_id||"—",Account:r.account_id||"—",Customer:r.customer_name||"",Date:r.date||"",Amount:parseFloat(r.amount)||0,Currency:r.currency||"INR",Type:r.txn_type||"",Channel:r.channel||"",Country:r.country||"",Risk:r.risk||"",Flags:(r.flags||[]).map(f=>`[${f.level}] ${f.rule}`).join(" | "),AI:r.aiInsight||"",Remarks:r.officerRemarks||"",Time:r.timestamp||"",Notes:r.notes||""}));
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(d);
+  XLSX.utils.book_append_sheet(wb,ws,"Transactions");XLSX.writeFile(wb,`${fn}_${td()}.xlsx`);
+}
+function pdf(rows,fn="aml"){
+  const c={HIGH:0,MEDIUM:0,LOW:0,CLEAN:0};rows.forEach(r=>{if(c[r.risk]!==undefined)c[r.risk]++;});
+  const rc={HIGH:"#ef4444",MEDIUM:"#f59e0b",LOW:"#06b6d4",CLEAN:"#10b981"};
+  const tr=rows.map(r=>`<tr><td>${r.txn_id||"—"}</td><td><b>${r.customer_name||""}</b></td><td>Rs.${fmt(r.amount)}</td><td>${r.txn_type||""}</td><td>${r.country||""}</td><td>${r.date||""}</td><td><span style="background:${rc[r.risk]};color:#fff;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700">${r.risk}</span></td><td style="font-size:9px;line-height:1.8">${(r.flags||[]).map(f=>`<span style="color:${rc[f.level]}">[${f.level}] ${f.rule}</span>`).join("<br/>")||"None"}</td><td style="font-size:9px">${r.officerRemarks||"—"}</td></tr>`).join("");
+  const html=`<!DOCTYPE html><html><head><style>@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Courier New',monospace;font-size:11px}.h{background:#0d1117;color:#fff;padding:16px 20px}.h h1{font-size:16px;font-weight:800;margin-bottom:3px}.h p{font-size:10px;color:#94a3b8}.ch{display:flex;gap:8px;padding:10px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0}.chip{padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;color:#fff}table{width:100%;border-collapse:collapse}th{background:#1e293b;color:#94a3b8;font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:7px 9px;text-align:left}td{padding:7px 9px;border-bottom:1px solid #f1f5f9;font-size:10px;vertical-align:top}tr:nth-child(even)td{background:#f8fafc}.ft{text-align:center;padding:10px;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:10px}</style></head><body><div class="h"><h1>AML Transaction Screening Report</h1><p>Krish Grover · BVoc BFSI · Ramanujan College · University of Delhi · Generated: ${now()}</p></div><div class="ch"><span class="chip" style="background:#ef4444">HIGH: ${c.HIGH}</span><span class="chip" style="background:#f59e0b">MEDIUM: ${c.MEDIUM}</span><span class="chip" style="background:#06b6d4">LOW: ${c.LOW}</span><span class="chip" style="background:#10b981">CLEAN: ${c.CLEAN}</span></div><table><thead><tr><th>TXN ID</th><th>Customer</th><th>Amount</th><th>Type</th><th>Country</th><th>Date</th><th>Risk</th><th>Flags</th><th>Officer Remarks</th></tr></thead><tbody>${tr}</tbody></table><div class="ft">© 2026 Krish Grover · Ramanujan College · University of Delhi · PMLA 2002 · FATF · RBI</div><script>window.onload=()=>window.print()<\/script></body></html>`;
+  const w=window.open("","_blank");if(w){w.document.write(html);w.document.close();}
+}
+const dlt=(content,fn,mt)=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([content],{type:mt}));a.download=fn;a.click();};
+const br=r=>({...r,fs:(r.flags||[]).map(f=>`[${f.level}] ${f.rule}`).join(" | ")});
+function sqlMySQL(rows,fn="aml_mysql"){const ins=rows.map(r=>{const d=br(r);return`INSERT INTO aml_transactions(txn_id,account_id,customer_name,txn_date,amount,currency,txn_type,channel,country,counterparty,risk_level,aml_flags,ai_insight,officer_remarks,notes)VALUES('${esc(d.txn_id)}','${esc(d.account_id)}','${esc(d.customer_name)}','${d.date||td()}',${parseFloat(d.amount)||0},'${esc(d.currency||"INR")}','${esc(d.txn_type)}','${esc(d.channel)}','${esc(d.country)}','${esc(d.counterparty)}','${d.risk}','${esc(d.fs)}','${esc(d.aiInsight||"")}','${esc(d.officerRemarks||"")}','${esc(d.notes||"")}');`;}).join("\n");dlt(`-- AML · MySQL · Krish Grover · Ramanujan College · DU · ${now()}\nCREATE DATABASE IF NOT EXISTS aml_checker;\nUSE aml_checker;\nCREATE TABLE IF NOT EXISTS aml_transactions(id INT AUTO_INCREMENT PRIMARY KEY,txn_id VARCHAR(50),account_id VARCHAR(50),customer_name VARCHAR(150) NOT NULL,txn_date DATE,amount DECIMAL(15,2) NOT NULL,currency VARCHAR(10) DEFAULT 'INR',txn_type VARCHAR(60),channel VARCHAR(40),country VARCHAR(120),counterparty VARCHAR(150),risk_level ENUM('HIGH','MEDIUM','LOW','CLEAN') NOT NULL,aml_flags TEXT,ai_insight TEXT,officer_remarks TEXT,notes TEXT,screened_at DATETIME DEFAULT CURRENT_TIMESTAMP,INDEX idx_risk(risk_level),INDEX idx_country(country))ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\n\n${ins}`,`${fn}_${td()}.sql`,"text/sql");}
+function sqlPG(rows,fn="aml_pg"){const ins=rows.map(r=>{const d=br(r);return`INSERT INTO aml_transactions(txn_id,account_id,customer_name,txn_date,amount,currency,txn_type,channel,country,counterparty,risk_level,aml_flags,ai_insight,officer_remarks,notes)VALUES('${esc(d.txn_id)}','${esc(d.account_id)}','${esc(d.customer_name)}','${d.date||td()}',${parseFloat(d.amount)||0},'${esc(d.currency||"INR")}','${esc(d.txn_type)}','${esc(d.channel)}','${esc(d.country)}','${esc(d.counterparty)}','${d.risk}','${esc(d.fs)}','${esc(d.aiInsight||"")}','${esc(d.officerRemarks||"")}','${esc(d.notes||"")}');`;}).join("\n");dlt(`-- AML · PostgreSQL · Krish Grover · Ramanujan College · DU · ${now()}\nCREATE TABLE IF NOT EXISTS aml_transactions(id SERIAL PRIMARY KEY,txn_id VARCHAR(50),account_id VARCHAR(50),customer_name VARCHAR(150) NOT NULL,txn_date DATE,amount NUMERIC(15,2) NOT NULL,currency VARCHAR(10) DEFAULT 'INR',txn_type VARCHAR(60),channel VARCHAR(40),country VARCHAR(120),counterparty VARCHAR(150),risk_level VARCHAR(10) CHECK(risk_level IN('HIGH','MEDIUM','LOW','CLEAN')),aml_flags TEXT,ai_insight TEXT,officer_remarks TEXT,notes TEXT,screened_at TIMESTAMPTZ DEFAULT NOW());\nCREATE INDEX IF NOT EXISTS idx_risk ON aml_transactions(risk_level);\n\n${ins}`,`${fn}_${td()}.sql`,"text/sql");}
+function sqlLite(rows,fn="aml_sqlite"){const ins=rows.map(r=>{const d=br(r);return`INSERT INTO aml_transactions VALUES(NULL,'${esc(d.txn_id)}','${esc(d.account_id)}','${esc(d.customer_name)}','${d.date||td()}',${parseFloat(d.amount)||0},'${esc(d.currency||"INR")}','${esc(d.txn_type)}','${esc(d.channel)}','${esc(d.country)}','${esc(d.counterparty)}','${d.risk}','${esc(d.fs)}','${esc(d.aiInsight||"")}','${esc(d.officerRemarks||"")}','${esc(d.notes||"")}','${esc(d.timestamp||now())}');`;}).join("\n");dlt(`-- AML · SQLite · Krish Grover · ${now()}\nPRAGMA journal_mode=WAL;\nCREATE TABLE IF NOT EXISTS aml_transactions(id INTEGER PRIMARY KEY AUTOINCREMENT,txn_id TEXT,account_id TEXT,customer_name TEXT NOT NULL,txn_date TEXT,amount REAL NOT NULL,currency TEXT DEFAULT 'INR',txn_type TEXT,channel TEXT,country TEXT,counterparty TEXT,risk_level TEXT NOT NULL,aml_flags TEXT,ai_insight TEXT,officer_remarks TEXT,notes TEXT,screened_at TEXT);\n\n${ins}`,`${fn}_${td()}.sql`,"text/sql");}
+function sqlSupa(rows,fn="aml_supabase"){const ins=rows.map(r=>{const d=br(r);return`INSERT INTO aml_transactions(txn_id,account_id,customer_name,txn_date,amount,currency,txn_type,channel,country,counterparty,risk_level,aml_flags,ai_insight,officer_remarks,notes)VALUES('${esc(d.txn_id)}','${esc(d.account_id)}','${esc(d.customer_name)}','${d.date||td()}',${parseFloat(d.amount)||0},'${esc(d.currency||"INR")}','${esc(d.txn_type)}','${esc(d.channel)}','${esc(d.country)}','${esc(d.counterparty)}','${d.risk}','${esc(d.fs)}','${esc(d.aiInsight||"")}','${esc(d.officerRemarks||"")}','${esc(d.notes||"")}');`;}).join("\n");dlt(`-- AML · Supabase · Paste in SQL Editor → Run · ${now()}\nCREATE TABLE IF NOT EXISTS aml_transactions(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,txn_id TEXT,account_id TEXT,customer_name TEXT NOT NULL,txn_date DATE,amount NUMERIC(15,2) NOT NULL,currency TEXT DEFAULT 'INR',txn_type TEXT,channel TEXT,country TEXT,counterparty TEXT,risk_level TEXT CHECK(risk_level IN('HIGH','MEDIUM','LOW','CLEAN')),aml_flags TEXT,ai_insight TEXT,officer_remarks TEXT,notes TEXT,screened_at TIMESTAMPTZ DEFAULT NOW());\n\n${ins}`,`${fn}_${td()}.sql`,"text/sql");}
+function jsonMongo(rows,fn="aml_mongo"){dlt(JSON.stringify(rows.map(r=>({txn_id:r.txn_id||"",account_id:r.account_id||"",customer_name:r.customer_name||"",txn_date:r.date||td(),amount:parseFloat(r.amount)||0,currency:r.currency||"INR",txn_type:r.txn_type||"",channel:r.channel||"",country:r.country||"",counterparty:r.counterparty||"",risk_level:r.risk||"",aml_flags:(r.flags||[]).map(f=>({level:f.level,rule:f.rule})),ai_insight:r.aiInsight||"",officer_remarks:r.officerRemarks||"",notes:r.notes||"",screened_at:r.timestamp||now()})),null,2),`${fn}_${td()}.json`,"application/json");}
+function jsonFirebase(rows,fn="aml_firebase"){const d={aml_transactions:{}};rows.forEach((r,i)=>{d.aml_transactions[r.id||`t${i}`]={txn_id:r.txn_id||"",customer_name:r.customer_name||"",txn_date:r.date||td(),amount:parseFloat(r.amount)||0,currency:r.currency||"INR",txn_type:r.txn_type||"",country:r.country||"",risk_level:r.risk||"",aml_flags:(r.flags||[]).map(f=>`[${f.level}] ${f.rule}`).join(" | "),officer_remarks:r.officerRemarks||"",screened_at:r.timestamp||now()};});dlt(JSON.stringify(d,null,2),`${fn}_${td()}.json`,"application/json");}
+
+async function getAI(entry){
+  if(entry.risk==="CLEAN")return"";
+  try{const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:`AML compliance expert PMLA 2002. In 3 sentences: professional recommendation for: ${entry.customer_name}, Rs.${entry.amount}, ${entry.txn_type}, ${entry.country}. Flags: ${entry.flags.map(f=>`[${f.level}] ${f.rule}`).join(", ")}. Risk: ${entry.risk}. Reference PMLA 2002/FATF/RBI.`}]})});const d=await res.json();return d?.content?.[0]?.text||"AI unavailable.";}catch(_){return"AI unavailable — check connection.";}
+}
+async function parsePDF(b64){
+  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"Extract ALL transactions. Return ONLY valid JSON array. Each object: {customer_name,amount,country,txn_type,txn_id,account_id,date,channel,counterparty,currency,notes}. Use '' for missing. amount=number. Return ONLY the JSON array."}]}]})});
+  const d=await res.json();
+  return JSON.parse((d?.content?.[0]?.text||"").trim().replace(/^```[\w]*\n?/,"").replace(/```$/,"").trim());
+}
+
+// ── COMPANY vs INDIVIDUAL DETECTION ──
+const COMPANY_KEYWORDS=/\b(ltd|limited|inc|incorporated|corp|corporation|llc|llp|pvt|private|co\.|company|group|holdings|enterprises|industries|associates|partners|solutions|technologies|services|international|global|national|bank|finance|capital|investment|trading|imports|exports|manufacturing|ventures|consultancy|consultants|agency|bureau|trust|foundation|institute|authority|board|council|exchange|securities|insurance|realty|properties|logistics|pharma|chemical|petroleum|energy|power|media|communications|telecom|retail|wholesale|distribution|suppliers|contractors|builders|developers|construction|infrastructure|engineering|automotive|aviation|shipping|freight|cargo|foods|beverages|textiles|apparel|furniture|electronics|software|tech|systems|networks|digital|innovations|research|analytics|advisory|management|resources|commodities|metals|minerals|agro|seeds|dairy|poultry|fisheries|plantation)\b/i;
+
+function isCompany(name){
+  if(!name||name.trim()==="")return false;
+  return COMPANY_KEYWORDS.test(name.trim());
+}
+
+// ── COMPANY LEGITIMACY CHECK via Claude API ──
+async function checkCompanyLegitimacy(companyName){
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",max_tokens:1000,
+        messages:[{role:"user",content:`You are a financial compliance analyst. For the company named "${companyName}", determine:
+1. Is this company listed on any major global stock exchange (NYSE, NASDAQ, BSE, NSE, LSE, TSX, ASX, HKEX, SGX, etc.)?
+2. If not listed, based on your knowledge, does this appear to be a legitimate operating business (has a known web presence, conducts real business, is publicly known)?
+
+Respond ONLY in this exact JSON format with no extra text:
+{"listed":true/false,"exchange":"Exchange name or null","ticker":"Ticker or null","legitimate":true/false/null,"reason":"One sentence explanation","confidence":"HIGH/MEDIUM/LOW"}
+
+If the company is completely unknown to you, set legitimate to null and confidence to LOW.`}]
+      })
+    });
+    const d=await res.json();
+    const raw=(d?.content?.[0]?.text||"").trim().replace(/^```[\w]*\n?/,"").replace(/```$/,"").trim();
+    return JSON.parse(raw);
+  }catch(_){
+    return{listed:false,exchange:null,ticker:null,legitimate:null,reason:"Company check unavailable.",confidence:"LOW"};
+  }
+}
+
+// ── TXN ID FORMAT DETECTION ──
+function detectTxnIdFormat(ids){
+  const valid=ids.filter(id=>id&&String(id).trim().length>0).map(id=>String(id).trim());
+  if(valid.length<2)return null;
+  const firstMatch=valid[0].match(/^([A-Za-z]+[-_/]?)/);
+  if(!firstMatch)return null;
+  const prefix=firstMatch[1];
+  const pct=valid.filter(id=>id.startsWith(prefix)).length/valid.length;
+  if(pct<0.7)return null;
+  const suffix=valid[0].slice(prefix.length);
+  const numMatch=suffix.match(/^(\d+)$/);
+  if(numMatch){
+    const dlen=numMatch[1].length;
+    const pattern=new RegExp(`^${prefix.replace(/[-_]/g,"[-_]")}\\d{1,${dlen+2}}$`,"i");
+    return{pattern,desc:`${prefix}${"X".repeat(dlen)} (e.g. ${valid[0]})`,example:valid[0]};
+  }
+  const pattern=new RegExp(`^${prefix.replace(/[-_]/g,"[-_]")}.+$`,"i");
+  return{pattern,desc:`Starting with "${prefix}" (e.g. ${valid[0]})`,example:valid[0]};
+}
+
+// ── CONFIRMATION MODAL ──
+function ConfirmModal({title,message,onConfirm,onCancel}){
+  return<div className="modal-overlay" onClick={onCancel}>
+    <div className="modal-box" onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:13,color:"#f1f5f9",fontWeight:600,marginBottom:10}}>{title}</div>
+      <div style={{fontSize:12,color:"#94a3b8",lineHeight:1.7,marginBottom:16}}>{message}</div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={onConfirm} style={{flex:1,background:"#ef4444",color:"#fff",border:"none",borderRadius:6,padding:"9px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,cursor:"pointer"}}>Confirm</button>
+        <button onClick={onCancel} style={{flex:1,background:"rgba(100,116,139,.2)",color:"#94a3b8",border:"1px solid #64748b",borderRadius:6,padding:"9px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,cursor:"pointer"}}>Cancel</button>
+      </div>
+    </div>
+  </div>;
+}
+
+function Alert({alerts,onDismiss}){
+  if(!alerts.length)return null;
+  return<div style={{position:"fixed",top:16,right:16,zIndex:9999,display:"flex",flexDirection:"column",gap:8,maxWidth:300}}>
+    {alerts.map((a,i)=><div key={i} style={{background:RS[a.risk].bg,border:`1px solid ${RS[a.risk].border}`,borderRadius:8,padding:"12px 14px",boxShadow:`0 4px 20px ${RS[a.risk].border}55`,animation:"slideR .3s ease"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+        <div>
+          <div style={{fontSize:11,color:RS[a.risk].text,fontWeight:700,marginBottom:3}}>🚨 {a.risk} RISK ALERT</div>
+          <div style={{fontSize:13,color:"#f1f5f9",fontWeight:600}}>{a.customer_name}</div>
+          <div style={{fontSize:11,color:"#64748b"}}>Rs.{fmt(a.amount)} · {a.txn_type}</div>
+          <div style={{fontSize:10,color:"#64748b"}}>{a.flags.length} trigger{a.flags.length!==1?"s":""}</div>
+        </div>
+        <button onClick={()=>onDismiss(i)} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:18,padding:0}}>✕</button>
+      </div>
+    </div>)}
+  </div>;
+}
+
+function Card({e,al,ai,cc,ccL,onXLS,onPDF,officerRemarks,setOfficerRemarks,onSignOff}){
+  const s=RS[e.risk];
+  const benefIsCompany=isCompany(e.counterparty||"");
+  return<div className="card" style={{background:s.bg,border:`1px solid ${s.border}`,borderRadius:10,padding:20}}>
+    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+      <div>
+        <div style={{fontSize:10,color:"#64748b",letterSpacing:".1em",marginBottom:4}}>SCREENING RESULT</div>
+        <div style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,color:"#f1f5f9"}}>{e.customer_name}</div>
+        <div style={{fontSize:11,color:"#64748b",marginTop:3}}>{e.txn_type} · Rs.{fmt(e.amount)} · {e.country} · {e.date}</div>
+      </div>
+      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+        <div style={{background:s.badge,color:s.bt,fontFamily:"'Syne',sans-serif",fontSize:14,fontWeight:800,padding:"9px 20px",borderRadius:6,letterSpacing:".1em"}}>{e.risk}</div>
+        {e.badges&&e.badges.map((b,i)=><div key={i} style={{background:"rgba(239,68,68,.2)",color:"#f87171",fontFamily:"'Syne',sans-serif",fontSize:11,fontWeight:700,padding:"6px 12px",borderRadius:6,letterSpacing:".05em"}}>{b}</div>)}
+      </div>
+    </div>
+    {e.flags.length===0
+      ?<div style={{background:"rgba(16,185,129,.08)",border:"1px solid #10b981",borderRadius:8,padding:"13px 15px",display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20}}>✅</span><div><div style={{color:"#34d399",fontWeight:600,fontSize:13}}>No AML Triggers Detected</div><div style={{color:"#64748b",fontSize:12,marginTop:2}}>Standard monitoring applies.</div></div></div>
+      :e.flags.map((f,i)=>{const fs=RS[f.level];return<div key={i} style={{background:"rgba(0,0,0,.3)",borderLeft:`3px solid ${fs.border}`,border:`1px solid ${fs.border}22`,borderRadius:"0 8px 8px 0",padding:"12px 14px",marginBottom:8}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:`${fs.badge}22`,color:fs.text,letterSpacing:".07em",fontWeight:600}}>{f.level}</span><span style={{fontSize:13,fontWeight:500,color:fs.text}}>{f.rule}</span></div><div style={{fontSize:12,color:"#94a3b8",lineHeight:1.65}}>{f.detail}</div></div>;})
+    }
+
+    {e.counterparty&&e.counterparty!=="—"&&<div style={{marginTop:12,background:"rgba(124,58,237,.06)",border:"1px solid rgba(124,58,237,.25)",borderRadius:8,padding:"14px 16px"}}>
+      <div style={{fontSize:10,color:"#a78bfa",letterSpacing:".1em",marginBottom:8,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        🏢 BENEFICIARY VERIFICATION
+        {ccL&&<span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>◌</span>}
+      </div>
+      <div style={{fontSize:12,color:"#64748b",marginBottom:8}}>
+        Beneficiary: <strong style={{color:"#e2e8f0"}}>{e.counterparty}</strong>
+        &nbsp;·&nbsp;
+        <span style={{padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:600,background:benefIsCompany?"rgba(124,58,237,.2)":"rgba(59,130,246,.15)",color:benefIsCompany?"#c4b5fd":"#60a5fa"}}>{benefIsCompany?"COMPANY":"INDIVIDUAL"}</span>
+      </div>
+      {!benefIsCompany&&<div style={{fontSize:12,color:"#94a3b8",lineHeight:1.65,padding:"8px 10px",background:"rgba(59,130,246,.06)",borderRadius:6,border:"1px solid rgba(59,130,246,.2)"}}>
+        👤 <strong style={{color:"#60a5fa"}}>Individual beneficiary</strong> — identity verification is left to the relevant authorities as per KYC norms. No automated company check required.
+      </div>}
+      {benefIsCompany&&ccL&&<div style={{fontSize:12,color:"#64748b"}}>Checking global stock exchanges and business registries...</div>}
+      {benefIsCompany&&!ccL&&cc&&<div>
+        {cc.listed?<div style={{padding:"10px 12px",background:"rgba(16,185,129,.08)",border:"1px solid #10b98155",borderRadius:6,fontSize:12,lineHeight:1.75}}>
+          <div style={{color:"#34d399",fontWeight:600,marginBottom:3}}>✅ Listed on {cc.exchange} {cc.ticker?`(${cc.ticker})`:""}</div>
+          <div style={{color:"#94a3b8"}}>{cc.reason} Confidence: <strong style={{color:"#e2e8f0"}}>{cc.confidence}</strong></div>
+        </div>
+        :<div>
+          {cc.legitimate===true&&<div style={{padding:"10px 12px",background:"rgba(245,158,11,.06)",border:"1px solid #f59e0b44",borderRadius:6,fontSize:12,lineHeight:1.75,marginBottom:6}}>
+            <div style={{color:"#fbbf24",fontWeight:600,marginBottom:3}}>⚠ Not listed on any major stock exchange</div>
+            <div style={{color:"#94a3b8"}}>However, appears to be a <strong style={{color:"#e2e8f0"}}>known legitimate business</strong>. {cc.reason} Confidence: <strong style={{color:"#e2e8f0"}}>{cc.confidence}</strong></div>
+          </div>}
+          {cc.legitimate===false&&<div style={{padding:"10px 12px",background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:6,fontSize:12,lineHeight:1.75,marginBottom:6}}>
+            <div style={{color:"#f87171",fontWeight:600,marginBottom:3}}>🚨 Not listed — legitimacy questionable</div>
+            <div style={{color:"#94a3b8"}}>{cc.reason} Confidence: <strong style={{color:"#e2e8f0"}}>{cc.confidence}</strong>. Consider requesting business registration documents before processing.</div>
+          </div>}
+          {cc.legitimate===null&&<div style={{padding:"10px 12px",background:"rgba(100,116,139,.08)",border:"1px solid #64748b44",borderRadius:6,fontSize:12,lineHeight:1.75,marginBottom:6}}>
+            <div style={{color:"#94a3b8",fontWeight:600,marginBottom:3}}>❓ Company not found in known records</div>
+            <div style={{color:"#94a3b8"}}>{cc.reason} Confidence: <strong style={{color:"#e2e8f0"}}>{cc.confidence}</strong>. Manually verify with business registration number and official documents.</div>
+          </div>}
+        </div>}
+      </div>}
+    </div>}
+
+    {(al||ai)&&<div style={{marginTop:12,background:"rgba(59,130,246,.06)",border:"1px solid rgba(59,130,246,.25)",borderRadius:8,padding:"14px 16px"}}>
+      <div style={{fontSize:10,color:"#60a5fa",letterSpacing:".1em",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>✦ AI RECOMMENDATION{al&&<span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>◌</span>}</div>
+      {al?<div style={{fontSize:12,color:"#64748b"}}>Analysing...</div>:<div style={{fontSize:12,color:"#94a3b8",lineHeight:1.75}}>{ai}</div>}
+    </div>}
+
+    {/* Officer Remarks Section */}
+    <div style={{marginTop:12,background:"rgba(168,85,247,.06)",border:"1px solid rgba(168,85,247,.25)",borderRadius:8,padding:"14px 16px"}}>
+      <div style={{fontSize:10,color:"#c084fc",letterSpacing:".1em",marginBottom:8}}>✍️ OFFICER REMARKS</div>
+      <textarea 
+        value={officerRemarks}
+        onChange={e=>setOfficerRemarks(e.target.value)}
+        placeholder="Enter compliance officer's notes, recommendations, or approval status..."
+        style={{...INP,minHeight:80,resize:"vertical",marginBottom:10,fontFamily:"'JetBrains Mono',monospace",fontSize:12}}
+      />
+      <button onClick={onSignOff} style={{background:"rgba(168,85,247,.15)",color:"#c084fc",border:"1px solid rgba(168,85,247,.3)",borderRadius:7,padding:"8px 16px",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:600,cursor:"pointer",transition:"all .2s"}}>
+        ✓ Sign-Off & Save to Record
+      </button>
+    </div>
+
+    <div style={{marginTop:12,padding:"9px 12px",background:"rgba(255,255,255,.02)",borderRadius:6,fontSize:10,color:"#64748b"}}>⚠ Compliance tool only. Final STR/CTR decisions must be made by a qualified Principal Officer — PMLA 2002 §12.</div>
+    <div style={{display:"flex",gap:10,marginTop:12}}>
+      <button onClick={onXLS} style={{flex:1,background:"rgba(16,185,129,.1)",color:"#34d399",border:"1px solid #10b98155",borderRadius:7,padding:"10px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,cursor:"pointer",transition:"all .2s"}}>⬇ Excel</button>
+      <button onClick={onPDF} style={{flex:1,background:"rgba(239,68,68,.1)",color:"#f87171",border:"1px solid #ef444455",borderRadius:7,padding:"10px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,cursor:"pointer",transition:"all .2s"}}>⬇ PDF</button>
+    </div>
+  </div>;
+}
+
+class ErrBound extends React.Component{
+  constructor(p){super(p);this.state={err:false,msg:""};}
+  static getDerivedStateFromError(e){return{err:true,msg:e.message||"Unknown error"};}
+  render(){
+    if(this.state.err)return(
+      <div style={{padding:"20px",background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:10,margin:"16px 0"}}>
+        <div style={{color:"#f87171",fontWeight:600,fontSize:13,marginBottom:6}}>⚠ Tab failed to load</div>
+        <div style={{color:"#94a3b8",fontSize:12}}>{this.state.msg}</div>
+        <button onClick={()=>this.setState({err:false,msg:""})} style={{marginTop:10,background:"rgba(239,68,68,.1)",color:"#f87171",border:"1px solid #ef444455",borderRadius:6,padding:"6px 14px",fontFamily:"'JetBrains Mono',monospace",fontSize:11,cursor:"pointer"}}>Retry</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
+// ═══════════════ MAIN APP ════════════════
+function App(){
+  const[form,setForm]=useState(E0);
+  const[result,setResult]=useState(null);
+  const[alL,setAlL]=useState(false);
+  const[alI,setAlI]=useState("");
+  const[sess,setSess]=useState([]);
+  const[recs,setRecs]=useState([]);
+  const[alerts,setAlerts]=useState([]);
+  const[tab,setTab]=useState("single");
+  const[err,setErr]=useState("");
+  const[dbSt,setDbSt]=useState("ready");
+  const[dbLang,setDbLang]=useState("mysql");
+  const[impSt,setImpSt]=useState("idle");
+  const[impCnt,setImpCnt]=useState(0);
+  const[impErr,setImpErr]=useState("");
+  const[fRows,setFRows]=useState([]);
+  const[fName,setFName]=useState("");
+  const[fLd,setFLd]=useState(false);
+  const[pLd,setPLd]=useState(false);
+  const[fErr,setFErr]=useState("");
+  const[bDone,setBDone]=useState(false);
+  const[ccData,setCcData]=useState(null);
+  const[ccLoad,setCcLoad]=useState(false);
+  const[txnFmt,setTxnFmt]=useState(null);
+  const[confirmModal,setConfirmModal]=useState(null);
+  const[officerRemarks,setOfficerRemarks]=useState("");
+
+  const sf=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  useEffect(()=>{(async()=>{try{const s=await DB.get("aml_v42");if(s?.value)setRecs(JSON.parse(s.value));}catch(_){}})();},[]);
+
+  const save=useCallback(async(r)=>{
+    setDbSt("saving");
+    try{
+      const limited=r.slice(0,50);
+      await DB.set("aml_v42",JSON.stringify(limited));
+      setRecs(limited);
+      setDbSt("saved");
+      setTimeout(()=>setDbSt("ready"),2000);
+    }catch(_){setDbSt("error");}
+  },[]);
+
+  const delR=useCallback((id)=>{
+    setConfirmModal({
+      title:"Delete Transaction?",
+      message:"This will permanently remove this record from the database.",
+      onConfirm:()=>{
+        const updated=recs.filter((r,i)=>(r.id||i)!==id);
+        save(updated);
+        setConfirmModal(null);
+      },
+      onCancel:()=>setConfirmModal(null)
+    });
+  },[recs,save]);
+
+  const delHistoryR=useCallback((id)=>{
+    setConfirmModal({
+      title:"Delete History Entry?",
+      message:"This will remove this transaction from your current session history.",
+      onConfirm:()=>{
+        const updated=sess.filter((r,i)=>(r.id||i)!==id);
+        setSess(updated);
+        setConfirmModal(null);
+      },
+      onCancel:()=>setConfirmModal(null)
+    });
+  },[sess]);
+
+  const clrDB=()=>{
+    setConfirmModal({
+      title:"Clear Entire Database?",
+      message:"This will permanently delete all stored transactions. This action cannot be undone.",
+      onConfirm:async()=>{
+        try{
+          await DB.del("aml_v42");
+          setRecs([]);
+          setConfirmModal(null);
+        }catch(_){}
+      },
+      onCancel:()=>setConfirmModal(null)
+    });
+  };
+
+  const chk=async()=>{
+    setErr("");setResult(null);setAlI("");setCcData(null);setOfficerRemarks("");
+    if(!form.customer_name||!form.amount||!form.txn_type||!form.country)return setErr("Customer name, amount, type, and country required.");
+    const{flags,risk,badges}=aml(form);
+    const entry={...form,id:uid(),flags,risk,badges:badges||[],timestamp:now()};
+    setResult(entry);
+    const upd=[entry,...sess];
+    setSess(upd);
+    if(risk==="HIGH"||risk==="MEDIUM"){
+      setAlerts(prev=>[...prev,entry].slice(0,3));
+      setAlL(true);
+      const insight=await getAI(entry);
+      setAlI(insight);
+      entry.aiInsight=insight;
+      setAlL(false);
+    }
+    const newRecs=[entry,...recs];
+    await save(newRecs);
+    if(entry.counterparty&&entry.counterparty!=="—"&&isCompany(entry.counterparty)){
+      setCcLoad(true);
+      const ccResult=await checkCompanyLegitimacy(entry.counterparty);
+      setCcData(ccResult);
+      setCcLoad(false);
+    }
+  };
+
+  const handleSignOff=()=>{
+    if(!result)return;
+    const updated={...result,officerRemarks};
+    setResult(updated);
+    const sessIdx=sess.findIndex(s=>s.id===result.id);
+    if(sessIdx!==-1){
+      const newSess=[...sess];
+      newSess[sessIdx]=updated;
+      setSess(newSess);
+    }
+    const recIdx=recs.findIndex(r=>r.id===result.id);
+    if(recIdx!==-1){
+      const newRecs=[...recs];
+      newRecs[recIdx]=updated;
+      save(newRecs);
+    }
+  };
+
+  // SANDBOX PRESETS
+  const loadLowRisk=()=>{
+    setForm({
+      txn_id:"LR2026001",
+      account_id:"ACC123456",
+      customer_name:"Amit Kumar",
+      date:td(),
+      amount:"25000",
+      currency:"INR",
+      txn_type:"UPI",
+      channel:"MOBILE_APP",
+      country:"India",
+      counterparty:"Sharma Electronics",
+      notes:"Payment for laptop purchase"
+    });
+    setTab("single");
+  };
+
+  const loadSuspiciousTrade=()=>{
+    setForm({
+      txn_id:"ST2026002",
+      account_id:"ACC987654",
+      customer_name:"Priya Merchants Ltd",
+      date:td(),
+      amount:"850000",
+      currency:"INR",
+      txn_type:"CASH_DEPOSIT",
+      channel:"BRANCH",
+      country:"India",
+      counterparty:"—",
+      notes:"Large cash deposit near threshold"
+    });
+    setTab("single");
+  };
+
+  const loadHighRiskCash=()=>{
+    setForm({
+      txn_id:"HR2026003",
+      account_id:"ACC555777",
+      customer_name:"Global Imports LLC",
+      date:td(),
+      amount:"1500000",
+      currency:"INR",
+      txn_type:"CASH_WITHDRAWAL",
+      channel:"BRANCH",
+      country:"India",
+      counterparty:"—",
+      notes:"CTR reportable transaction"
+    });
+    setTab("single");
+  };
+
+  const BX=({o,col,bg,bd,c})=><button onClick={o} style={{background:bg,color:col,border:bd,borderRadius:7,padding:"9px 14px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,cursor:"pointer",transition:"all .2s"}}>{c}</button>;
+
+  const sc=sess.reduce((a,r)=>{a[r.risk]=(a[r.risk]||0)+1;return a;},{HIGH:0,MEDIUM:0,LOW:0,CLEAN:0});
+
+  const fileToB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(f);});
+
+  const handleUpload=async(e)=>{
+    const f=e.target.files?.[0];if(!f)return;setFName(f.name);setFErr("");
+    const ext=f.name.split(".").pop().toLowerCase();
+    if(ext==="pdf"){
+      setPLd(true);
+      try{
+        const b64=await fileToB64(f);
+        const rows=await parsePDF(b64);
+        setFRows(rows.map(r=>mr(r)));
+        setFLd(false);setPLd(false);
+      }catch(err){setFErr("PDF parse failed: "+err.message);setPLd(false);}
+    }else if(ext==="xlsx"){
+      setFLd(true);
+      const r=new FileReader();r.onload=ev=>{
+        try{
+          const wb=XLSX.read(ev.target.result,{type:"binary"});
+          const ws=wb.Sheets[wb.SheetNames[0]];
+          const data=XLSX.utils.sheet_to_json(ws);
+          setFRows(data.map(r=>mr(r)));
+          setFLd(false);
+        }catch(err){setFErr("Excel parse failed: "+err.message);setFLd(false);}
+      };r.readAsBinaryString(f);
+    }else if(ext==="csv"){
+      setFLd(true);
+      Papa.parse(f,{header:true,complete:res=>{setFRows(res.data.map(r=>mr(r)));setFLd(false);},error:err=>{setFErr("CSV parse failed: "+err.message);setFLd(false);}});
+    }else{setFErr("Unsupported format. Use .xlsx, .csv, or .pdf");}
+  };
+
+  const runBatch=async()=>{
+    if(!fRows.length)return;setBDone(false);setImpSt("idle");
+    const ids=fRows.map(r=>r.txn_id).filter(Boolean);
+    const fmt=detectTxnIdFormat(ids);
+    setTxnFmt(fmt);
+    const checked=[];
+    for(const raw of fRows){
+      const t={...E0,...raw,amount:parseFloat(raw.amount)||0,currency:raw.currency||"INR",date:raw.date||td()};
+      const{flags,risk,badges}=aml(t);
+      checked.push({...t,id:uid(),flags,risk,badges:badges||[],timestamp:now()});
+    }
+    const newRecs=[...checked,...recs];
+    await save(newRecs);
+    setSess(prev=>[...checked,...prev]);
+    setBDone(true);
+  };
+
+  const handleImport=async(e)=>{
+    const f=e.target.files?.[0];if(!f)return;
+    setImpSt("loading");setImpCnt(0);setImpErr("");
+    const ext=f.name.split(".").pop().toLowerCase();
+    try{
+      let data=[];
+      if(ext==="json"){
+        const txt=await f.text();
+        data=JSON.parse(txt);
+        if(!Array.isArray(data))throw new Error("JSON must be an array.");
+      }else if(ext==="xlsx"){
+        const b=await f.arrayBuffer();
+        const wb=XLSX.read(b);
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        data=XLSX.utils.sheet_to_json(ws);
+      }else if(ext==="csv"){
+        await new Promise((res,rej)=>{
+          Papa.parse(f,{header:true,complete:r=>{data=r.data;res();},error:rej});
+        });
+      }else throw new Error("Unsupported format.");
+      const mapped=data.map(r=>mr(r));
+      const checked=[];
+      for(const raw of mapped){
+        const t={...E0,...raw,amount:parseFloat(raw.amount)||0,currency:raw.currency||"INR",date:raw.date||td()};
+        const{flags,risk,badges}=aml(t);
+        checked.push({...t,id:uid(),flags,risk,badges:badges||[],timestamp:now()});
+      }
+      const newRecs=[...checked,...recs];
+      await save(newRecs);
+      setSess(prev=>[...checked,...prev]);
+      setImpCnt(checked.length);
+      setImpSt("done");
+    }catch(err){setImpErr(err.message);setImpSt("error");}
+  };
+
+  const DB_LANGS=[
+    {id:"mysql",label:"MySQL",color:"#f59e0b",bg:"rgba(245,158,11,.08)",border:"#f59e0b",ext:".sql",icon:"🐬",fn:sqlMySQL,tool:"mysqldump",canDirect:false,steps:[{n:1,t:"Download SQL file",d:"Click 'Download MySQL file' above."},{n:2,t:"Import via terminal",d:"Run: mysql -u root -p aml_checker < aml_mysql_YYYY-MM-DD.sql"},{n:3,t:"Or use GUI",d:"phpMyAdmin / MySQL Workbench → Import → select .sql file"}]},
+    {id:"postgres",label:"PostgreSQL",color:"#3b82f6",bg:"rgba(59,130,246,.08)",border:"#3b82f6",ext:".sql",icon:"🐘",fn:sqlPG,tool:"psql",canDirect:false,steps:[{n:1,t:"Download SQL file",d:"Click 'Download PostgreSQL file' above."},{n:2,t:"Import via psql",d:"Run: psql -U postgres -d aml_checker -f aml_pg_YYYY-MM-DD.sql"},{n:3,t:"Or use pgAdmin",d:"Right-click database → Restore → select .sql file"}]},
+    {id:"sqlite",label:"SQLite",color:"#06b6d4",bg:"rgba(6,182,212,.08)",border:"#06b6d4",ext:".sql",icon:"🗃",fn:sqlLite,tool:"sqlite3",canDirect:false,steps:[{n:1,t:"Download SQL file",d:"Click 'Download SQLite file' above."},{n:2,t:"Import via sqlite3",d:"Run: sqlite3 aml_checker.db < aml_sqlite_YYYY-MM-DD.sql"},{n:3,t:"Or use DB Browser",d:"DB Browser for SQLite → Execute SQL → paste contents"}]},
+    {id:"supabase",label:"Supabase",color:"#10b981",bg:"rgba(16,185,129,.08)",border:"#10b981",ext:".sql",icon:"⚡",fn:sqlSupa,tool:"SQL Editor",canDirect:true,steps:[{n:1,t:"Download SQL file",d:"Click 'Download Supabase file' above."},{n:2,t:"Open SQL Editor",d:"Supabase Dashboard → SQL Editor → New query"},{n:3,t:"Paste & Run",d:"Copy entire .sql file content → Paste → Click 'Run'"}]},
+    {id:"mongo",label:"MongoDB",color:"#34d399",bg:"rgba(52,211,153,.08)",border:"#34d399",ext:".json",icon:"🍃",fn:jsonMongo,tool:"mongoimport",canDirect:false,steps:[{n:1,t:"Download JSON file",d:"Click 'Download MongoDB file' above."},{n:2,t:"Import via mongoimport",d:"Run: mongoimport --db aml_checker --collection transactions --file aml_mongo_YYYY-MM-DD.json --jsonArray"},{n:3,t:"Or use Compass",d:"MongoDB Compass → aml_checker → transactions → Import Data"}]},
+    {id:"firebase",label:"Firebase",color:"#fbbf24",bg:"rgba(251,191,36,.08)",border:"#fbbf24",ext:".json",icon:"🔥",fn:jsonFirebase,tool:"Firebase Console",canDirect:true,steps:[{n:1,t:"Download JSON file",d:"Click 'Download Firebase file' above."},{n:2,t:"Open Realtime Database",d:"Firebase Console → Realtime Database → Data tab"},{n:3,t:"Import JSON",d:"Click ⋮ menu → Import JSON → select aml_firebase_YYYY-MM-DD.json"}]}
+  ];
+
+  const lang=DB_LANGS.find(l=>l.id===dbLang)||DB_LANGS[0];
+
+  return<div style={{background:"#080c10",minHeight:"100vh",paddingBottom:60}}>
+    <Alert alerts={alerts} onDismiss={i=>setAlerts(a=>a.filter((_,j)=>j!==i))}/>
+    {confirmModal&&<ConfirmModal {...confirmModal}/>}
+
+    {/* Header */}
+    <div style={{background:"linear-gradient(135deg,#0d1117 0%,#1a1f2e 100%)",borderBottom:"1px solid #1e3a5f",padding:"16px 20px"}}>
+      <div style={{maxWidth:880,margin:"0 auto"}}>
+        <div style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:900,color:"#f1f5f9",marginBottom:4}}>AML Transaction Checker Pro</div>
+        <div style={{fontSize:11,color:"#64748b"}}>PMLA 2002 · FATF · RBI · AI-Assisted · Krish Grover · Ramanujan College · University of Delhi</div>
+      </div>
+    </div>
+
+    {/* Tabs */}
+    <div style={{background:"#0d1117",borderBottom:"1px solid #1e3a5f",padding:"0 20px"}}>
+      <div style={{maxWidth:880,margin:"0 auto",display:"flex",gap:4}}>
+        {[["single","Single"],["batch","Batch"],["sandbox","Sandbox"],["database","Database"],["history","History"]].map(([id,lbl])=>
+          <button key={id} onClick={()=>setTab(id)} style={{background:tab===id?"#1e3a5f":"transparent",color:tab===id?"#60a5fa":"#64748b",border:"none",borderBottom:tab===id?"2px solid #3b82f6":"2px solid transparent",padding:"12px 18px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,cursor:"pointer",transition:"all .2s"}}>{lbl}</button>
+        )}
+      </div>
+    </div>
+
+    {/* Main */}
+    <div style={{maxWidth:880,margin:"0 auto",padding:"20px"}}>
+
+    {/* ══ TAB 1: SINGLE ══ */}
+    {tab==="single"&&<ErrBound><div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,marginBottom:16}}>
+        <div><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>TXN ID</label><input value={form.txn_id} onChange={e=>sf("txn_id",e.target.value)} style={INP} placeholder="T2026001"/></div>
+        <div><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Account ID</label><input value={form.account_id} onChange={e=>sf("account_id",e.target.value)} style={INP} placeholder="ACC123456"/></div>
+      </div>
+      <div style={{marginBottom:16}}><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Customer Name*</label><input value={form.customer_name} onChange={e=>sf("customer_name",e.target.value)} style={INP} placeholder="Amit Kumar / ABC Pvt Ltd"/></div>
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12,marginBottom:16}}>
+        <div><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Amount (Rs.)*</label><input type="number" value={form.amount} onChange={e=>sf("amount",e.target.value)} style={INP} placeholder="100000"/></div>
+        <div><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Currency</label><select value={form.currency} onChange={e=>sf("currency",e.target.value)} style={INP}><option value="INR">INR</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></div>
+        <div><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Date</label><input type="date" value={form.date} onChange={e=>sf("date",e.target.value)} style={INP}/></div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12,marginBottom:16}}>
+        <div><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Transaction Type*</label><select value={form.txn_type} onChange={e=>sf("txn_type",e.target.value)} style={INP}><option value="">Select...</option>{TXG.map(g=><optgroup key={g.g} label={g.g}>{g.i.map(t=><option key={t} value={t}>{t}</option>)}</optgroup>)}</select></div>
+        <div><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Channel</label><select value={form.channel} onChange={e=>sf("channel",e.target.value)} style={INP}><option value="BRANCH">BRANCH</option><option value="ATM">ATM</option><option value="INTERNET">INTERNET</option><option value="MOBILE_APP">MOBILE_APP</option><option value="PHONE">PHONE</option></select></div>
+      </div>
+      <div style={{marginBottom:16}}><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Country*</label><select value={form.country} onChange={e=>sf("country",e.target.value)} style={INP}><option value="">Select...</option>{CTRY.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+      <div style={{marginBottom:16}}><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Beneficiary / Counterparty</label><input value={form.counterparty} onChange={e=>sf("counterparty",e.target.value)} style={INP} placeholder="Sharma Electronics / John Doe"/></div>
+      <div style={{marginBottom:16}}><label style={{display:"block",fontSize:11,color:"#64748b",marginBottom:6,letterSpacing:".05em"}}>Notes</label><textarea value={form.notes} onChange={e=>sf("notes",e.target.value)} style={{...INP,minHeight:60,resize:"vertical"}} placeholder="Additional context..."/></div>
+      {err&&<div style={{padding:"10px 14px",background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:8,marginBottom:16,fontSize:12,color:"#f87171"}}>❌ {err}</div>}
+      <button onClick={chk} style={{width:"100%",background:"linear-gradient(135deg,#3b82f6,#2563eb)",color:"#fff",border:"none",borderRadius:8,padding:"14px",fontFamily:"'Syne',sans-serif",fontSize:14,fontWeight:800,cursor:"pointer",letterSpacing:".1em",transition:"all .2s"}}>🔍 RUN AML CHECK</button>
+      {result&&<div style={{marginTop:16}}><Card e={result} al={alL} ai={alI} cc={ccData} ccL={ccLoad} onXLS={()=>xls([result],"single")} onPDF={()=>pdf([result],"single")} officerRemarks={officerRemarks} setOfficerRemarks={setOfficerRemarks} onSignOff={handleSignOff}/></div>}
+    </div></ErrBound>}
+
+    {/* ══ TAB 2: BATCH ══ */}
+    {tab==="batch"&&<ErrBound><div>
+      <div style={{background:"#0d1117",border:"1px solid #1e3a5f",borderRadius:10,padding:20,marginBottom:16}}>
+        <div style={{fontSize:10,color:"#64748b",letterSpacing:".1em",marginBottom:14,textTransform:"uppercase"}}>Step 1 — Upload Transactions File</div>
+        <label style={{display:"block",textAlign:"center",padding:"30px 20px",background:"rgba(59,130,246,.05)",border:"2px dashed #3b82f6",borderRadius:10,cursor:"pointer",transition:"all .2s"}}>
+          <input type="file" accept=".xlsx,.csv,.pdf" onChange={handleUpload} style={{display:"none"}}/>
+          <div style={{fontSize:20,marginBottom:8}}>📁</div>
+          <div style={{fontSize:13,color:"#60a5fa",fontWeight:600,marginBottom:4}}>Click to upload file</div>
+          <div style={{fontSize:11,color:"#64748b"}}>Excel · CSV · PDF</div>
+          <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:10}}>{["XLSX","CSV","PDF"].map(b=><span key={b} style={{fontSize:10,padding:"2px 9px",borderRadius:4,background:"rgba(59,130,246,.12)",color:"#60a5fa",border:"1px solid rgba(59,130,246,.3)"}}>{b}</span>)}</div>
+        </label>
+        {fLd&&<div style={{marginTop:10,padding:"10px 14px",background:"rgba(59,130,246,.08)",border:"1px solid rgba(59,130,246,.3)",borderRadius:8,fontSize:12,color:"#60a5fa"}}>⏳ Reading file...</div>}
+        {pLd&&<div style={{marginTop:10,padding:"10px 14px",background:"rgba(59,130,246,.08)",border:"1px solid rgba(59,130,246,.3)",borderRadius:8,fontSize:12,color:"#60a5fa"}}>⏳ Extracting from PDF via AI...</div>}
+        {fErr&&<div style={{marginTop:10,padding:"10px 14px",background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:8,fontSize:12,color:"#f87171"}}>❌ {fErr}</div>}
+        {fRows.length>0&&<div style={{marginTop:10,padding:"10px 14px",background:"rgba(16,185,129,.08)",border:"1px solid #10b98155",borderRadius:8,fontSize:12,color:"#34d399"}}>✅ {fRows.length} rows loaded from {fName}</div>}
+      </div>
+
+      {fRows.length>0&&<div style={{background:"#0d1117",border:"1px solid #1e3a5f",borderRadius:10,padding:20,marginBottom:16}}>
+        <div style={{fontSize:10,color:"#64748b",letterSpacing:".1em",marginBottom:14,textTransform:"uppercase"}}>Step 2 — Preview & Run Checks</div>
+        <div style={{maxHeight:200,overflow:"auto",marginBottom:14}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead><tr style={{background:"#080c10"}}><th style={{padding:"6px 8px",textAlign:"left",color:"#64748b",fontSize:10}}>Customer</th><th style={{padding:"6px 8px",textAlign:"left",color:"#64748b",fontSize:10}}>Amount</th><th style={{padding:"6px 8px",textAlign:"left",color:"#64748b",fontSize:10}}>Type</th><th style={{padding:"6px 8px",textAlign:"left",color:"#64748b",fontSize:10}}>Country</th></tr></thead>
+            <tbody>{fRows.slice(0,10).map((r,i)=><tr key={i} style={{borderBottom:"1px solid #1e3a5f22"}}><td style={{padding:"6px 8px",color:"#e2e8f0"}}>{r.customer_name||"—"}</td><td style={{padding:"6px 8px",color:"#e2e8f0"}}>Rs.{fmt(parseFloat(r.amount)||0)}</td><td style={{padding:"6px 8px",color:"#94a3b8"}}>{r.txn_type||"—"}</td><td style={{padding:"6px 8px",color:"#94a3b8"}}>{r.country||"—"}</td></tr>)}</tbody>
+          </table>
+          {fRows.length>10&&<div style={{fontSize:10,color:"#64748b",marginTop:8,textAlign:"center"}}>+ {fRows.length-10} more rows...</div>}
+        </div>
+        <button onClick={runBatch} style={{width:"100%",background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff",border:"none",borderRadius:8,padding:"12px",fontFamily:"'Syne',sans-serif",fontSize:13,fontWeight:800,cursor:"pointer",letterSpacing:".1em"}}>⚡ RUN BATCH AML CHECK — {fRows.length} transactions</button>
+        {bDone&&<div style={{marginTop:10,padding:"10px 14px",background:"rgba(16,185,129,.08)",border:"1px solid #10b98155",borderRadius:8,fontSize:12,color:"#34d399"}}>✅ {fRows.length} transactions checked and saved.</div>}
+      </div>}
+
+      {txnFmt&&<div style={{background:"rgba(168,85,247,.06)",border:"1px solid rgba(168,85,247,.3)",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#c084fc",marginBottom:16}}>🔍 <strong>Detected TXN ID Format:</strong> {txnFmt.desc}</div>}
+    </div></ErrBound>}
+
+    {/* ══ TAB 3: SANDBOX ══ */}
+    {tab==="sandbox"&&<ErrBound><div>
+      <div style={{background:"#0d1117",border:"1px solid #1e3a5f",borderRadius:10,padding:20,marginBottom:16}}>
+        <div style={{fontSize:10,color:"#64748b",letterSpacing:".1em",marginBottom:14,textTransform:"uppercase"}}>🧪 Sandbox — Test Cases</div>
+        <div style={{fontSize:12,color:"#94a3b8",marginBottom:16,lineHeight:1.7}}>
+          Click any button below to auto-fill the Single Transaction form with pre-configured test data. Use these to quickly test different AML scenarios.
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
+          <button onClick={loadLowRisk} style={{background:"rgba(16,185,129,.1)",color:"#34d399",border:"1px solid #10b98155",borderRadius:8,padding:"14px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"left",transition:"all .2s"}}>
+            <div style={{fontSize:11,color:"#10b981",marginBottom:4,fontWeight:700}}>✅ Low Risk</div>
+            <div style={{fontSize:10,color:"#64748b"}}>₹25,000 UPI · India</div>
+          </button>
+          <button onClick={loadSuspiciousTrade} style={{background:"rgba(245,158,11,.1)",color:"#fbbf24",border:"1px solid #f59e0b55",borderRadius:8,padding:"14px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"left",transition:"all .2s"}}>
+            <div style={{fontSize:11,color:"#f59e0b",marginBottom:4,fontWeight:700}}>⚠️ Suspicious Trade</div>
+            <div style={{fontSize:10,color:"#64748b"}}>₹8.5L Cash · Near CTR</div>
+          </button>
+          <button onClick={loadHighRiskCash} style={{background:"rgba(239,68,68,.1)",color:"#f87171",border:"1px solid #ef444455",borderRadius:8,padding:"14px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"left",transition:"all .2s"}}>
+            <div style={{fontSize:11,color:"#ef4444",marginBottom:4,fontWeight:700}}>🚨 High Risk Cash</div>
+            <div style={{fontSize:10,color:"#64748b"}}>₹15L Cash · CTR Report</div>
+          </button>
+        </div>
+      </div>
+
+      <div style={{background:"rgba(124,58,237,.06)",border:"1px solid rgba(124,58,237,.25)",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#a78bfa"}}>
+        💡 <strong>Tip:</strong> After loading a test case, switch to the "Single" tab to review the pre-filled form and run the AML check.
+      </div>
+    </div></ErrBound>}
+
+    {/* ══ TAB 4: DATABASE ══ */}
+    {tab==="database"&&<ErrBound><div>
+      <div style={{background:"#0d1117",border:"1px solid #1e3a5f",borderRadius:10,padding:20,marginBottom:16}}>
+        <div style={{fontSize:10,color:"#64748b",letterSpacing:".12em",marginBottom:16,textTransform:"uppercase"}}>Step 1 — Select Database Platform</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10}}>
+          {DB_LANGS.map(l=><button key={l.id} onClick={()=>setDbLang(l.id)} style={{background:dbLang===l.id?l.bg:"rgba(100,116,139,.05)",color:dbLang===l.id?l.color:"#64748b",border:dbLang===l.id?`1px solid ${l.border}55`:"1px solid #1e3a5f",borderRadius:8,padding:"12px 10px",fontSize:11,fontWeight:600,cursor:"pointer",transition:"all .2s",textAlign:"center"}}>{l.icon} {l.label}</button>)}
+        </div>
+      </div>
+
+      <div style={{background:"#0d1117",border:`1px solid ${lang.color}33`,borderRadius:10,padding:20,marginBottom:16}}>
+        <div style={{fontSize:10,color:"#64748b",letterSpacing:".12em",marginBottom:16,textTransform:"uppercase"}}>Step 2 — Import Existing Data</div>
+        <label style={{display:"block",textAlign:"center",padding:"24px 20px",background:lang.bg,border:`2px dashed ${lang.color}`,borderRadius:10,cursor:"pointer",marginBottom:10}}>
+          <input type="file" accept=".xlsx,.csv,.json" onChange={handleImport} style={{display:"none"}}/>
+          <div style={{fontSize:20,marginBottom:8}}>{lang.icon}</div>
+          <div style={{fontSize:13,color:lang.color,fontWeight:600,marginBottom:4}}>Import transactions from file</div>
+          <div style={{fontSize:11,color:"#64748b"}}>Excel · CSV · JSON</div>
+          <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:10}}>{["XLSX","CSV","JSON"].map(b=><span key={b} style={{fontSize:10,padding:"2px 9px",borderRadius:4,background:"rgba(59,130,246,.12)",color:"#60a5fa",border:"1px solid rgba(59,130,246,.3)"}}>{b}</span>)}</div>
+        </label>
+        {impSt==="loading"&&<div style={{padding:"10px 14px",background:"rgba(59,130,246,.08)",border:"1px solid rgba(59,130,246,.3)",borderRadius:8,fontSize:12,color:"#60a5fa"}}>⏳ Reading and running AML checks...</div>}
+        {impSt==="done"&&<div style={{padding:"10px 14px",background:"rgba(16,185,129,.08)",border:"1px solid #10b98155",borderRadius:8,fontSize:12,color:"#34d399"}}>✅ {impCnt} records imported and saved.</div>}
+        {impSt==="error"&&<div style={{padding:"10px 14px",background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:8,fontSize:12,color:"#f87171"}}>❌ {impErr}</div>}
+        <div style={{marginTop:14,padding:"12px 14px",background:"#080c10",border:"1px solid #1e3a5f",borderRadius:8}}>
+          <div style={{fontSize:10,color:"#64748b",letterSpacing:".1em",marginBottom:8,textTransform:"uppercase"}}>What format?</div>
+          <div style={{fontSize:12,color:"#94a3b8",lineHeight:2}}><span style={{color:"#34d399"}}>Excel (.xlsx)</span> — Use template from File Upload tab.<br/><span style={{color:"#60a5fa"}}>CSV (.csv)</span> — Same columns, comma-separated.<br/><span style={{color:"#fb923c"}}>JSON (.json)</span> — MongoDB/Firebase export from this app.</div>
+        </div>
+      </div>
+
+      <div style={{background:"#0d1117",border:`1px solid ${lang.color}33`,borderRadius:10,padding:20,marginBottom:16}}>
+        <div style={{fontSize:10,color:"#64748b",letterSpacing:".12em",marginBottom:16,textTransform:"uppercase"}}>Step 3 — How to Import into {lang.label}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {lang.steps.map((s,i)=><div key={i} style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+            <div style={{width:28,height:28,borderRadius:"50%",background:lang.bg,border:`1px solid ${lang.color}55`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13,color:lang.color}}>{s.n}</div>
+            <div style={{flex:1,paddingTop:4}}><div style={{fontSize:13,color:"#e2e8f0",fontWeight:600,marginBottom:4}}>{s.t}</div><div style={{fontSize:12,color:"#94a3b8",lineHeight:1.75}}>{s.d}</div></div>
+          </div>)}
+        </div>
+        {lang.canDirect
+          ?<div style={{marginTop:14,padding:"10px 14px",background:lang.bg,border:`1px solid ${lang.color}33`,borderRadius:8,fontSize:12,color:lang.color}}>✅ <strong>Direct Upload Supported</strong> — no terminal needed via {lang.tool}.</div>
+          :<div style={{marginTop:14,padding:"10px 14px",background:"rgba(245,158,11,.06)",border:"1px solid #f59e0b33",borderRadius:8,fontSize:12,color:"#fbbf24"}}>⚙️ <strong>Terminal / Dashboard Required</strong> — follow steps above.</div>
+        }
+        <div style={{display:"flex",gap:10,marginTop:14,flexWrap:"wrap"}}>
+          <button onClick={()=>lang.fn(recs,`aml_${lang.id}`)} style={{background:lang.bg,color:lang.color,border:`1px solid ${lang.border}`,borderRadius:8,padding:"11px 18px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,cursor:"pointer",transition:"all .2s"}}>{lang.icon} Download {lang.label} file {lang.ext} — {recs.length} records</button>
+          {recs.filter(r=>r.risk==="HIGH").length>0&&<button onClick={()=>lang.fn(recs.filter(r=>r.risk==="HIGH"),`aml_${lang.id}_high`)} style={{background:"rgba(239,68,68,.1)",color:"#f87171",border:"1px solid #ef444455",borderRadius:8,padding:"11px 16px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,cursor:"pointer"}}>🚨 HIGH Only</button>}
+        </div>
+      </div>
+
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <BX o={()=>xls(recs,"aml_db")} col="#34d399" bg="rgba(16,185,129,.1)" bd="1px solid #10b98155" c="⬇ All — Excel"/>
+        <BX o={()=>pdf(recs,"aml_db")} col="#f87171" bg="rgba(239,68,68,.1)" bd="1px solid #ef444455" c="⬇ All — PDF"/>
+        <button onClick={clrDB} style={{background:"rgba(239,68,68,.05)",color:"#ef4444",border:"1px solid #ef444433",borderRadius:7,padding:"9px 14px",fontFamily:"'JetBrains Mono',monospace",fontSize:12,cursor:"pointer",marginLeft:"auto"}}>🗑 Clear DB</button>
+      </div>
+
+      {recs.length===0?<div style={{textAlign:"center",padding:"50px 20px",color:"#64748b",fontSize:13}}>Database empty.<span style={{display:"block",fontSize:11,opacity:.6,marginTop:6}}>Every checked transaction is auto-saved here.</span></div>
+      :<div style={{background:"#0d1117",border:"1px solid #1e3a5f",borderRadius:10,padding:20}}>
+        <div style={{fontSize:10,color:"#64748b",letterSpacing:".1em",marginBottom:14,textTransform:"uppercase"}}>{recs.length} stored records &nbsp;·&nbsp; <span style={{color:"#374151"}}>max 50, newest first</span></div>
+        {recs.map((r,i)=><div key={r.id||i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid #1e3a5f22",gap:10,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:120}}><div style={{fontWeight:600,color:"#f1f5f9",fontSize:13}}>{r.customer_name}</div><div style={{fontSize:11,color:"#64748b"}}>{r.txn_type} · Rs.{fmt(r.amount)} · {r.country}</div><div style={{fontSize:10,color:"#374151",marginTop:2}}>{r.timestamp}</div></div>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            <button onClick={()=>xls([r],`txn${i}`)} style={{background:"none",border:"1px solid #1e3a5f",color:"#64748b",borderRadius:5,padding:"4px 8px",fontFamily:"'JetBrains Mono',monospace",fontSize:9,cursor:"pointer"}}>XLS</button>
+            <button onClick={()=>pdf([r],`txn${i}`)} style={{background:"none",border:"1px solid #1e3a5f",color:"#64748b",borderRadius:5,padding:"4px 8px",fontFamily:"'JetBrains Mono',monospace",fontSize:9,cursor:"pointer"}}>PDF</button>
+            <button onClick={()=>lang.fn([r],`txn${i}`)} style={{background:"none",border:`1px solid ${lang.color}44`,color:lang.color,borderRadius:5,padding:"4px 8px",fontFamily:"'JetBrains Mono',monospace",fontSize:9,cursor:"pointer"}}>{lang.ext.replace(".","").toUpperCase()}</button>
+            <span style={{background:RS[r.risk].badge,color:RS[r.risk].bt,fontSize:10,fontWeight:700,fontFamily:"'Syne',sans-serif",padding:"3px 9px",borderRadius:20}}>{r.risk}</span>
+            <button onClick={()=>delR(r.id||i)} style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:15,padding:"0 2px"}}>✕</button>
+          </div>
+        </div>)}
+      </div>}
+    </div></ErrBound>}
+
+    {/* ══ TAB 5: HISTORY ══ */}
+    {tab==="history"&&<div>
+      {sess.length>0&&<>
+        <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+          <BX o={()=>xls(sess,"aml_session")} col="#34d399" bg="rgba(16,185,129,.1)" bd="1px solid #10b98155" c="⬇ Session — Excel"/>
+          <BX o={()=>pdf(sess,"aml_session")} col="#f87171" bg="rgba(239,68,68,.1)" bd="1px solid #ef444455" c="⬇ Session — PDF"/>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>{["HIGH","MEDIUM","LOW","CLEAN"].map(r=><div key={r} style={{background:RS[r].bg,border:`1px solid ${RS[r].border}44`,borderRadius:8,padding:"12px",textAlign:"center"}}><div style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:800,color:RS[r].text}}>{sc[r]}</div><div style={{fontSize:10,color:"#64748b",letterSpacing:".07em"}}>{r}</div></div>)}</div>
+      </>}
+      {sess.length===0?<div style={{textAlign:"center",padding:"60px 20px",color:"#64748b",fontSize:13}}>No transactions this session.<span style={{display:"block",fontSize:11,opacity:.6,marginTop:6}}>Checks done since opening appear here.</span></div>
+      :sess.map((h,i)=><div key={h.id||i} style={{background:"#0d1117",border:`1px solid ${RS[h.risk].border}44`,borderRadius:8,padding:"13px 15px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:120}}><div style={{fontWeight:600,color:"#f1f5f9",fontSize:14,marginBottom:2}}>{h.customer_name}</div><div style={{fontSize:11,color:"#64748b"}}>{h.txn_type} · Rs.{fmt(h.amount)} · {h.country}</div><div style={{fontSize:10,color:"#374151",marginTop:2}}>{h.flags.length} flag{h.flags.length!==1?"s":""} · {h.timestamp}</div></div>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <button onClick={()=>xls([h],`txn${i}`)} style={{background:"none",border:"1px solid #1e3a5f",color:"#64748b",borderRadius:5,padding:"4px 9px",fontFamily:"'JetBrains Mono',monospace",fontSize:10,cursor:"pointer"}}>XLS</button>
+          <button onClick={()=>pdf([h],`txn${i}`)} style={{background:"none",border:"1px solid #1e3a5f",color:"#64748b",borderRadius:5,padding:"4px 9px",fontFamily:"'JetBrains Mono',monospace",fontSize:10,cursor:"pointer"}}>PDF</button>
+          <span style={{background:RS[h.risk].badge,color:RS[h.risk].bt,fontSize:11,fontWeight:700,fontFamily:"'Syne',sans-serif",padding:"4px 12px",borderRadius:20}}>{h.risk}</span>
+          <button onClick={()=>delHistoryR(h.id||i)} style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:15,padding:"0 2px"}}>✕</button>
+        </div>
+      </div>)}
+    </div>}
+
+    </div>
+
+    {/* Footer */}
+    <div style={{background:"#0d1117",borderTop:"1px solid #1e3a5f",padding:"14px 20px"}}>
+      <div style={{maxWidth:880,margin:"0 auto",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+        <div style={{fontSize:10,color:"#374151"}}>© 2026 Krish Grover · Ramanujan College · University of Delhi · All Rights Reserved</div>
+        <div style={{fontSize:10,color:"#374151"}}>AML Checker Pro v4.5 · PMLA 2002 · FATF · RBI · Company Check · MySQL · MongoDB · Firebase</div>
+      </div>
+    </div>
+  </div>;
+}
+
+document.getElementById("load").style.display="none";
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
